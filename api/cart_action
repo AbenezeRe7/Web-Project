@@ -1,1 +1,49 @@
+<?php
+/**
+ * Cart AJAX endpoint.
+ * POST action=add|update|remove, product_id, quantity
+ * Returns JSON: {success, message, cart_count, subtotal, total}
+ */
+require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/functions.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    json_response(['success' => false, 'message' => 'Invalid request method.'], 405);
+}
+if (!verify_csrf()) {
+    json_response(['success' => false, 'message' => 'Session expired. Please refresh the page.'], 419);
+}
+
+$action = $_POST['action'] ?? 'add';
+$productId = (int) ($_POST['product_id'] ?? 0);
+$quantity = (int) ($_POST['quantity'] ?? 1);
+
+if ($productId <= 0) {
+    json_response(['success' => false, 'message' => 'Invalid product.'], 422);
+}
+
+switch ($action) {
+    case 'add':
+        [$ok, $msg] = cart_add($productId, max(1, $quantity));
+        break;
+    case 'update':
+        [$ok, $msg] = cart_update($productId, $quantity);
+        break;
+    case 'remove':
+        [$ok, $msg] = cart_remove($productId);
+        break;
+    default:
+        json_response(['success' => false, 'message' => 'Unknown action.'], 422);
+}
+
+$details = get_cart_details();
+json_response([
+    'success'    => $ok,
+    'message'    => $msg,
+    'cart_count' => $details['count'],
+    'quantity'   => get_cart()[$productId] ?? 0,
+    'subtotal'   => $details['subtotal'],
+    'shipping'   => $details['shipping'],
+    'total'      => $details['total'],
+]);
 
